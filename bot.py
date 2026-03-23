@@ -2,16 +2,6 @@
 🎶 Music — Telegram Music Bot
 """
 
-import telegram
-from telegram import InlineKeyboardButton as _OrigBtn
-
-_PTB_SUPPORTS_EMOJI = tuple(int(x) for x in telegram.__version__.split(".")[:2]) >= (21, 0)
-
-def InlineKeyboardButton(text, **kwargs):
-    if not _PTB_SUPPORTS_EMOJI:
-        kwargs.pop("icon_custom_emoji_id", None)
-    return _OrigBtn(text, **kwargs)
-
 from __future__ import annotations
 
 import json
@@ -42,7 +32,6 @@ BOT_TOKEN       = "8746018197:AAGBrL62143LPDOZkhrWVRJIE5w46rFV0Y8"
 ADMIN_IDS       = [8535260202]
 CHANNEL_ID      = "-1003852929433"
 CHANNEL_LINK    = "https://t.me/FV_bots"
-AUDIO_EFFECT_ID = "5104841245755180586"
 
 DOWNLOADS    = Path("downloads")
 DOWNLOADS.mkdir(exist_ok=True)
@@ -63,36 +52,12 @@ CHART_CACHE_TTL = 1800  # 30 минут
 BOT_USERNAME = ""
 
 _chart_cache: tuple[list, float] = ([], 0.0)
-_dl_semaphore: asyncio.Semaphore | None = None  # инициализируется в main
+_dl_semaphore: asyncio.Semaphore | None = None
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 
 ytmusic = YTMusic()
-
-# ═══════════════════════════════════════════════════
-#  ЭМОДЗИ
-# ═══════════════════════════════════════════════════
-
-EMO_SEARCH  = "5870676941614354370"
-EMO_FAVS    = "6032644646587338669"
-EMO_WAVE    = "5345906554510012647"
-EMO_HOME    = "5873147866364514353"
-EMO_DL      = "6039802767931871481"
-EMO_HEART   = "6039486778597970865"
-EMO_UNHEART = "5870657884844462243"
-EMO_OK      = "5870633910337015697"
-EMO_PREV    = "5893057118545646106"
-EMO_NEXT    = "5963103826075456248"
-EMO_SUB     = "6039486778597970865"
-EMO_CHECK   = "5870633910337015697"
-EMO_CHART   = "5870930636742595124"
-EMO_REVIEW  = "5870764288364252592"
-EMO_ADMIN   = "5870982283724328568"
-EMO_TRASH   = "5870875489362513438"
-EMO_SEND    = "5963103826075456248"
-EMO_STAR    = "6041731551845159060"
-EMO_USERS   = "5870982283724328568"
 
 # ═══════════════════════════════════════════════════
 #  УТИЛИТЫ
@@ -298,11 +263,11 @@ async def is_subscribed(bot, uid: int) -> bool:
 
 def _sub_kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Подписаться", url=CHANNEL_LINK, icon_custom_emoji_id=EMO_SUB)],
-        [InlineKeyboardButton("Проверить подписку", callback_data="check_sub", icon_custom_emoji_id=EMO_CHECK)],
+        [InlineKeyboardButton("🔔 Подписаться", url=CHANNEL_LINK)],
+        [InlineKeyboardButton("✅ Проверить подписку", callback_data="check_sub")],
     ])
 
-SUB_TEXT = f'<b><tg-emoji emoji-id="{EMO_SUB}">🔔</tg-emoji> Подпишись на канал, чтобы пользоваться ботом</b>'
+SUB_TEXT = '<b>🔔 Подпишись на канал, чтобы пользоваться ботом</b>'
 
 # ═══════════════════════════════════════════════════
 #  YTMUSIC
@@ -347,10 +312,9 @@ def _parse_chart_item(r: dict) -> dict | None:
         log.debug("_parse_chart_item: %s", e)
         return None
 
-# Плейлисты русских чартов на YouTube Music
 _RU_CHART_PLAYLISTS = [
-    "RDCLAK5uy_kmPRjHDECIcuVwnKsx2Ns7MmAFHTVAtiY",  # Hot 100 RU
-    "RDCLAK5uy_lv8-EoTBt5zYXqMCGMnpBmxGhFEqzDUQU",  # Trending RU
+    "RDCLAK5uy_kmPRjHDECIcuVwnKsx2Ns7MmAFHTVAtiY",
+    "RDCLAK5uy_lv8-EoTBt5zYXqMCGMnpBmxGhFEqzDUQU",
 ]
 
 def _fetch_playlist_tracks(playlist_id: str, limit: int) -> list[dict]:
@@ -375,7 +339,6 @@ def yt_charts() -> list[dict]:
         return cached_items
     log.info("charts: загружаю русские чарты...")
 
-    # 1. Пробуем get_charts(country="RU")
     try:
         charts = ytmusic.get_charts(country="RU")
         songs_block = charts.get("songs") or {}
@@ -394,7 +357,6 @@ def yt_charts() -> list[dict]:
     except Exception as e:
         log.error("charts get_charts: %s", e)
 
-    # 2. Пробуем русские плейлисты чартов
     for pl_id in _RU_CHART_PLAYLISTS:
         out = _fetch_playlist_tracks(pl_id, CHART_SIZE)
         if out:
@@ -402,7 +364,6 @@ def yt_charts() -> list[dict]:
             log.info("charts: %d треков из плейлиста %s", len(out), pl_id)
             return out
 
-    # 3. Фолбэк — поиск по нескольким запросам, объединяем и дедуплицируем
     log.info("charts: фолбэк на поиск русских хитов")
     fallback_queries = [
         "снг хиты 2025 2026",
@@ -535,18 +496,18 @@ def _progress_text(pct: int, stage: str, title: str = "", artist: str = "") -> s
 #  МЕНЮ
 # ═══════════════════════════════════════════════════
 
-MENU_TEXT = f'<b><tg-emoji emoji-id="6041731551845159060">🎉</tg-emoji> Music</b>'
+MENU_TEXT = '<b>🎵 Music</b>'
 
 def _menu_kb(uid: int) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("Поиск",     callback_data="search",  icon_custom_emoji_id=EMO_SEARCH)],
-        [InlineKeyboardButton("Хиты",      callback_data="charts",  icon_custom_emoji_id=EMO_CHART),
-         InlineKeyboardButton("Отзывы",    callback_data="reviews", icon_custom_emoji_id=EMO_REVIEW)],
-        [InlineKeyboardButton("Избранное", callback_data="favs",    icon_custom_emoji_id=EMO_FAVS),
-         InlineKeyboardButton("Моя волна", callback_data="wave",    icon_custom_emoji_id=EMO_WAVE)],
+        [InlineKeyboardButton("🔎 Поиск",     callback_data="search")],
+        [InlineKeyboardButton("📊 Хиты",      callback_data="charts"),
+         InlineKeyboardButton("🙂 Отзывы",    callback_data="reviews")],
+        [InlineKeyboardButton("❤️ Избранное", callback_data="favs"),
+         InlineKeyboardButton("🌊 Моя волна", callback_data="wave")],
     ]
     if uid in ADMIN_IDS:
-        rows.append([InlineKeyboardButton("Админ", callback_data="admin", icon_custom_emoji_id=EMO_ADMIN)])
+        rows.append([InlineKeyboardButton("⚙️ Админ", callback_data="admin")])
     return InlineKeyboardMarkup(rows)
 
 # ═══════════════════════════════════════════════════
@@ -558,10 +519,10 @@ async def _open_search(chat, ctx, bot):
     await _del_extra(bot, chat.id, ctx)
     await _safe_delete(bot, chat.id, ctx.user_data.pop("main_mid", None))
     msg = await chat.send_message(
-        f'<b><tg-emoji emoji-id="{EMO_SEARCH}">🔎</tg-emoji> Название трека или исполнитель:</b>',
+        '<b>🔎 Название трека или исполнитель:</b>',
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]
+            [InlineKeyboardButton("🏠 Главная", callback_data="home")]
         ])
     )
     ctx.user_data["search_mid"] = msg.message_id
@@ -574,8 +535,8 @@ async def _show_search_results(bot, chat_id: int, msg_id: int, ctx, page: int = 
     if not items:
         await _safe_edit(bot, chat_id, msg_id, "<b>Ничего не найдено</b>",
                          InlineKeyboardMarkup([
-                             [InlineKeyboardButton("Поиск",   callback_data="search", icon_custom_emoji_id=EMO_SEARCH)],
-                             [InlineKeyboardButton("Главная", callback_data="home",   icon_custom_emoji_id=EMO_HOME)],
+                             [InlineKeyboardButton("🔎 Поиск",   callback_data="search")],
+                             [InlineKeyboardButton("🏠 Главная", callback_data="home")],
                          ]))
         return
     total  = len(items)
@@ -584,51 +545,51 @@ async def _show_search_results(bot, chat_id: int, msg_id: int, ctx, page: int = 
     ctx.user_data["spage"] = page
     s      = page * SEARCH_PER_PAGE
     chunk  = items[s:s + SEARCH_PER_PAGE]
-    text   = f'<b><tg-emoji emoji-id="{EMO_SEARCH}">🔎</tg-emoji> {query} — {total} треков</b>'
+    text   = f'<b>🔎 {query} — {total} треков</b>'
     b = [[InlineKeyboardButton(_cut(f"{tr['artist']} — {tr['title']}"), callback_data=f"sr_{s + i}")] for i, tr in enumerate(chunk)]
     nav = []
-    if page > 0:         nav.append(InlineKeyboardButton("Назад", callback_data="sprev", icon_custom_emoji_id=EMO_PREV))
+    if page > 0:         nav.append(InlineKeyboardButton("◀️ Назад", callback_data="sprev"))
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
-    if page < pages - 1: nav.append(InlineKeyboardButton("Далее", callback_data="snext", icon_custom_emoji_id=EMO_NEXT))
+    if page < pages - 1: nav.append(InlineKeyboardButton("Далее ▶️", callback_data="snext"))
     b.append(nav)
-    b.append([InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)])
+    b.append([InlineKeyboardButton("🏠 Главная", callback_data="home")])
     await _safe_edit(bot, chat_id, msg_id, text, InlineKeyboardMarkup(b))
 
 async def _show_favs(bot, chat_id: int, msg_id: int, uid: int, page: int = 0):
     items = fav_list(uid)
     if not items:
         await _safe_edit(bot, chat_id, msg_id,
-                         f'<b><tg-emoji emoji-id="{EMO_FAVS}">❤️</tg-emoji> Избранное пусто</b>',
-                         InlineKeyboardMarkup([[InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]]))
+                         '<b>❤️ Избранное пусто</b>',
+                         InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главная", callback_data="home")]]))
         return
     pages  = (len(items) - 1) // SEARCH_PER_PAGE + 1
     page   = max(0, min(page, pages - 1))
     s      = page * SEARCH_PER_PAGE
     chunk  = items[s:s + SEARCH_PER_PAGE]
-    text   = f'<b><tg-emoji emoji-id="{EMO_FAVS}">❤️</tg-emoji> Избранное — {len(items)} треков</b>'
+    text   = f'<b>❤️ Избранное — {len(items)} треков</b>'
     b = [[InlineKeyboardButton(_cut(f"{tr['artist']} — {tr['title']}"), callback_data=f"ft_{s + i}")] for i, tr in enumerate(chunk)]
     nav = []
-    if page > 0:         nav.append(InlineKeyboardButton("Назад", callback_data=f"fp_{page - 1}", icon_custom_emoji_id=EMO_PREV))
+    if page > 0:         nav.append(InlineKeyboardButton("◀️ Назад", callback_data=f"fp_{page - 1}"))
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
-    if page < pages - 1: nav.append(InlineKeyboardButton("Далее", callback_data=f"fp_{page + 1}", icon_custom_emoji_id=EMO_NEXT))
+    if page < pages - 1: nav.append(InlineKeyboardButton("Далее ▶️", callback_data=f"fp_{page + 1}"))
     b.append(nav)
-    b.append([InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)])
+    b.append([InlineKeyboardButton("🏠 Главная", callback_data="home")])
     await _safe_edit(bot, chat_id, msg_id, text, InlineKeyboardMarkup(b))
 
 async def _show_wave(bot, chat_id: int, msg_id: int, tr: dict, uid: int, ctx):
     vid  = tr["id"]
-    heart_emo, heart_text = (EMO_UNHEART, "Убрать") if fav_ok(uid, vid) else (EMO_HEART, "В избр.")
+    heart_text = "💔 Убрать" if fav_ok(uid, vid) else "❤️ В избр."
     idx  = ctx.user_data.get("wi", 0)
     total = len(ctx.user_data.get("wave", []))
     dur  = f"  •  {tr['dur']}" if tr.get("dur") else ""
-    text = (f'<b><tg-emoji emoji-id="{EMO_WAVE}">🌊</tg-emoji> Моя волна  {idx + 1}/{total}</b>\n\n'
+    text = (f'<b>🌊 Моя волна  {idx + 1}/{total}</b>\n\n'
             f"<b>{tr['title']}</b>\n<blockquote>{tr['artist']}{dur}</blockquote>")
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Пред.",    callback_data="wp",         icon_custom_emoji_id=EMO_PREV),
-         InlineKeyboardButton("Скачать", callback_data=f"wd_{vid}",  icon_custom_emoji_id=EMO_DL),
-         InlineKeyboardButton(heart_text,callback_data=f"wf_{vid}",  icon_custom_emoji_id=heart_emo),
-         InlineKeyboardButton("След.",   callback_data="wn",         icon_custom_emoji_id=EMO_NEXT)],
-        [InlineKeyboardButton("Главная", callback_data="home",        icon_custom_emoji_id=EMO_HOME)],
+        [InlineKeyboardButton("◀️ Пред.",  callback_data="wp"),
+         InlineKeyboardButton("⬇️ Скачать", callback_data=f"wd_{vid}"),
+         InlineKeyboardButton(heart_text,  callback_data=f"wf_{vid}"),
+         InlineKeyboardButton("След. ▶️",  callback_data="wn")],
+        [InlineKeyboardButton("🏠 Главная", callback_data="home")],
     ])
     await _safe_edit(bot, chat_id, msg_id, text, kb)
 
@@ -639,7 +600,7 @@ async def _show_charts(bot, chat_id: int, msg_id: int, ctx, page: int = 0):
         ctx.user_data["chart_items"] = items
     if not items:
         await _safe_edit(bot, chat_id, msg_id, "<b>Хиты недоступны</b>",
-                         InlineKeyboardMarkup([[InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]]))
+                         InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главная", callback_data="home")]]))
         return
     total  = len(items)
     pages  = (total - 1) // SEARCH_PER_PAGE + 1
@@ -647,45 +608,45 @@ async def _show_charts(bot, chat_id: int, msg_id: int, ctx, page: int = 0):
     ctx.user_data["cpage"] = page
     s      = page * SEARCH_PER_PAGE
     chunk  = items[s:s + SEARCH_PER_PAGE]
-    text   = f'<b><tg-emoji emoji-id="{EMO_CHART}">📊</tg-emoji> Хиты — {total} треков</b>'
+    text   = f'<b>📊 Хиты — {total} треков</b>'
     b = [[InlineKeyboardButton(_cut(f"#{s + i + 1} {tr['artist']} — {tr['title']}"), callback_data=f"ch_{s + i}")] for i, tr in enumerate(chunk)]
     nav = []
-    if page > 0:         nav.append(InlineKeyboardButton("Назад", callback_data=f"cp_{page - 1}", icon_custom_emoji_id=EMO_PREV))
+    if page > 0:         nav.append(InlineKeyboardButton("◀️ Назад", callback_data=f"cp_{page - 1}"))
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
-    if page < pages - 1: nav.append(InlineKeyboardButton("Далее", callback_data=f"cp_{page + 1}", icon_custom_emoji_id=EMO_NEXT))
+    if page < pages - 1: nav.append(InlineKeyboardButton("Далее ▶️", callback_data=f"cp_{page + 1}"))
     b.append(nav)
-    b.append([InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)])
+    b.append([InlineKeyboardButton("🏠 Главная", callback_data="home")])
     await _safe_edit(bot, chat_id, msg_id, text, InlineKeyboardMarkup(b))
 
 async def _show_chart_track(bot, chat_id: int, msg_id: int, tr: dict, uid: int, ctx):
     vid  = tr["id"]
-    heart_emo, heart_text = (EMO_UNHEART, "Убрать") if fav_ok(uid, vid) else (EMO_HEART, "В избр.")
+    heart_text = "💔 Убрать" if fav_ok(uid, vid) else "❤️ В избр."
     dur  = f"  •  {tr['dur']}" if tr.get("dur") else ""
     cpage = ctx.user_data.get("cpage", 0)
-    text = (f'<b><tg-emoji emoji-id="{EMO_CHART}">📊</tg-emoji> Хиты</b>\n\n'
+    text = (f'<b>📊 Хиты</b>\n\n'
             f"<b>{tr['title']}</b>\n<blockquote>{tr['artist']}{dur}</blockquote>")
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Скачать",  callback_data=f"chd_{vid}",  icon_custom_emoji_id=EMO_DL),
-         InlineKeyboardButton(heart_text, callback_data=f"chf_{vid}",  icon_custom_emoji_id=heart_emo)],
-        [InlineKeyboardButton("К хитам",  callback_data=f"cp_{cpage}", icon_custom_emoji_id=EMO_PREV),
-         InlineKeyboardButton("Главная",  callback_data="home",         icon_custom_emoji_id=EMO_HOME)],
+        [InlineKeyboardButton("⬇️ Скачать",  callback_data=f"chd_{vid}"),
+         InlineKeyboardButton(heart_text,    callback_data=f"chf_{vid}")],
+        [InlineKeyboardButton("◀️ К хитам",  callback_data=f"cp_{cpage}"),
+         InlineKeyboardButton("🏠 Главная",  callback_data="home")],
     ])
     await _safe_edit(bot, chat_id, msg_id, text, kb)
 
 def _stars_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(str(i), callback_data=f"rev_s_{i}") for i in range(1, 6)],
-        [InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)],
+        [InlineKeyboardButton("🏠 Главная", callback_data="home")],
     ])
 
 async def _show_reviews(bot, chat_id: int, msg_id: int, uid: int = 0, page: int = 0):
     items = rev_all()
     user_has_review = rev_has(uid) if uid else False
-    review_btn = [] if user_has_review else [[InlineKeyboardButton("Оставить отзыв", callback_data="rev_new", icon_custom_emoji_id=EMO_STAR)]]
-    home_btn   = [[InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]]
+    review_btn = [] if user_has_review else [[InlineKeyboardButton("⭐ Оставить отзыв", callback_data="rev_new")]]
+    home_btn   = [[InlineKeyboardButton("🏠 Главная", callback_data="home")]]
     if not items:
         await _safe_edit(bot, chat_id, msg_id,
-                         f'<b><tg-emoji emoji-id="{EMO_REVIEW}">🙂</tg-emoji> Отзывов пока нет</b>',
+                         '<b>🙂 Отзывов пока нет</b>',
                          InlineKeyboardMarkup(review_btn + home_btn))
         return
     total  = len(items)
@@ -693,29 +654,29 @@ async def _show_reviews(bot, chat_id: int, msg_id: int, uid: int = 0, page: int 
     page   = max(0, min(page, pages - 1))
     s      = page * REV_PER_PAGE
     chunk  = items[s:s + REV_PER_PAGE]
-    text   = f'<b><tg-emoji emoji-id="{EMO_REVIEW}">🙂</tg-emoji> Отзывы — {total} шт.</b>\n\n'
+    text   = f'<b>🙂 Отзывы — {total} шт.</b>\n\n'
     for r in chunk:
         text += f'<b>Отзыв #{r["id"]}</b>  {_stars(r["stars"])}\n<i>{r["text"]}</i>\n<code>{r["date"]}</code>\n\n'
     b = []
     nav = []
-    if page > 0:         nav.append(InlineKeyboardButton("Назад", callback_data=f"rp_{page - 1}", icon_custom_emoji_id=EMO_PREV))
+    if page > 0:         nav.append(InlineKeyboardButton("◀️ Назад", callback_data=f"rp_{page - 1}"))
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
-    if page < pages - 1: nav.append(InlineKeyboardButton("Далее", callback_data=f"rp_{page + 1}", icon_custom_emoji_id=EMO_NEXT))
+    if page < pages - 1: nav.append(InlineKeyboardButton("Далее ▶️", callback_data=f"rp_{page + 1}"))
     if nav:
         b.append(nav)
     b += review_btn + home_btn
     await _safe_edit(bot, chat_id, msg_id, text, InlineKeyboardMarkup(b))
 
 async def _show_admin(bot, chat_id: int, msg_id: int | None = None):
-    text = (f'<b><tg-emoji emoji-id="{EMO_ADMIN}">⚙️</tg-emoji> Админ-панель</b>\n\n'
+    text = (f'<b>⚙️ Админ-панель</b>\n\n'
             f'👥 Пользователей: <b>{len(_users_ids())}</b>\n'
             f'🚫 Забанено: <b>{len(_load_bans())}</b>\n'
             f'💬 Отзывов: <b>{len(rev_all())}</b>')
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Пользователи",  callback_data="adm_users_0",   icon_custom_emoji_id=EMO_USERS)],
-        [InlineKeyboardButton("Рассылка",      callback_data="adm_broadcast", icon_custom_emoji_id=EMO_SEND)],
-        [InlineKeyboardButton("Удалить отзыв", callback_data="adm_revs",      icon_custom_emoji_id=EMO_TRASH)],
-        [InlineKeyboardButton("Главная",        callback_data="home",          icon_custom_emoji_id=EMO_HOME)],
+        [InlineKeyboardButton("👥 Пользователи",  callback_data="adm_users_0")],
+        [InlineKeyboardButton("📢 Рассылка",      callback_data="adm_broadcast")],
+        [InlineKeyboardButton("🗑 Удалить отзыв", callback_data="adm_revs")],
+        [InlineKeyboardButton("🏠 Главная",        callback_data="home")],
     ])
     if msg_id and await _safe_edit(bot, chat_id, msg_id, text, kb):
         return
@@ -726,14 +687,14 @@ async def _show_admin_users(bot, chat_id: int, msg_id: int, page: int = 0):
     bans  = _load_bans()
     if not users:
         await _safe_edit(bot, chat_id, msg_id, "<b>Пользователей нет</b>",
-                         InlineKeyboardMarkup([[InlineKeyboardButton("Назад", callback_data="admin", icon_custom_emoji_id=EMO_PREV)]]))
+                         InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data="admin")]]))
         return
     total  = len(users)
     pages  = (total - 1) // USERS_PER_PAGE + 1
     page   = max(0, min(page, pages - 1))
     s      = page * USERS_PER_PAGE
     chunk  = users[s:s + USERS_PER_PAGE]
-    text   = (f'<b><tg-emoji emoji-id="{EMO_USERS}">⚙️</tg-emoji> Пользователи — {total} чел.</b>\n'
+    text   = (f'<b>⚙️ Пользователи — {total} чел.</b>\n'
               f'<i>👤 — забанить  |  🚫 — разбанить</i>')
     b = []
     for u in chunk:
@@ -742,35 +703,35 @@ async def _show_admin_users(bot, chat_id: int, msg_id: int, page: int = 0):
         cb     = f"adm_unban_{u}" if banned else f"adm_ban_{u}"
         b.append([InlineKeyboardButton(label, callback_data=cb)])
     nav = []
-    if page > 0:         nav.append(InlineKeyboardButton("Назад", callback_data=f"adm_users_{page - 1}", icon_custom_emoji_id=EMO_PREV))
+    if page > 0:         nav.append(InlineKeyboardButton("◀️ Назад", callback_data=f"adm_users_{page - 1}"))
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
-    if page < pages - 1: nav.append(InlineKeyboardButton("Далее", callback_data=f"adm_users_{page + 1}", icon_custom_emoji_id=EMO_NEXT))
+    if page < pages - 1: nav.append(InlineKeyboardButton("Далее ▶️", callback_data=f"adm_users_{page + 1}"))
     if nav:
         b.append(nav)
-    b.append([InlineKeyboardButton("В панель", callback_data="admin", icon_custom_emoji_id=EMO_ADMIN)])
+    b.append([InlineKeyboardButton("⚙️ В панель", callback_data="admin")])
     await _safe_edit(bot, chat_id, msg_id, text, InlineKeyboardMarkup(b))
 
 async def _show_admin_reviews(bot, chat_id: int, msg_id: int, page: int = 0):
     items = rev_all()
     if not items:
         await _safe_edit(bot, chat_id, msg_id, "<b>Отзывов нет</b>",
-                         InlineKeyboardMarkup([[InlineKeyboardButton("Назад", callback_data="admin", icon_custom_emoji_id=EMO_PREV)]]))
+                         InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад", callback_data="admin")]]))
         return
     pages  = (len(items) - 1) // REV_PER_PAGE + 1
     page   = max(0, min(page, pages - 1))
     s      = page * REV_PER_PAGE
     chunk  = items[s:s + REV_PER_PAGE]
-    text   = f'<b><tg-emoji emoji-id="{EMO_TRASH}">🗑</tg-emoji> Управление отзывами</b>\n\n'
+    text   = f'<b>🗑 Управление отзывами</b>\n\n'
     for r in chunk:
         text += f'<b>#{r["id"]}</b> {_stars(r["stars"])} — <i>{r["text"][:50]}</i>\n'
-    b = [[InlineKeyboardButton(f"Удалить #{r['id']}", callback_data=f"adm_del_{r['id']}", icon_custom_emoji_id=EMO_TRASH)] for r in chunk]
+    b = [[InlineKeyboardButton(f"🗑 Удалить #{r['id']}", callback_data=f"adm_del_{r['id']}")] for r in chunk]
     nav = []
-    if page > 0:         nav.append(InlineKeyboardButton("Назад", callback_data=f"arp_{page - 1}", icon_custom_emoji_id=EMO_PREV))
+    if page > 0:         nav.append(InlineKeyboardButton("◀️ Назад", callback_data=f"arp_{page - 1}"))
     nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
-    if page < pages - 1: nav.append(InlineKeyboardButton("Далее", callback_data=f"arp_{page + 1}", icon_custom_emoji_id=EMO_NEXT))
+    if page < pages - 1: nav.append(InlineKeyboardButton("Далее ▶️", callback_data=f"arp_{page + 1}"))
     if nav:
         b.append(nav)
-    b.append([InlineKeyboardButton("В панель", callback_data="admin", icon_custom_emoji_id=EMO_ADMIN)])
+    b.append([InlineKeyboardButton("⚙️ В панель", callback_data="admin")])
     await _safe_edit(bot, chat_id, msg_id, text, InlineKeyboardMarkup(b))
 
 # ═══════════════════════════════════════════════════
@@ -852,11 +813,9 @@ async def _do_dl(bot, chat_id: int, uid: int, tr: dict, ctx):
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton(
                              "💔 Убрать" if fav_ok(uid, vid) else "❤️ В избранное",
-                             callback_data=f"trf_{vid}",
-                             icon_custom_emoji_id=EMO_UNHEART if fav_ok(uid, vid) else EMO_HEART),
-                         InlineKeyboardButton("🗑 Удалить", callback_data="del_track", icon_custom_emoji_id=EMO_TRASH)],
+                             callback_data=f"trf_{vid}"),
+                         InlineKeyboardButton("🗑 Удалить", callback_data="del_track")],
                     ]),
-                    message_effect_id=AUDIO_EFFECT_ID
                 )
             ctx.user_data["last_track_msg"] = sent.message_id
             ctx.user_data["last_track"] = tr
@@ -873,8 +832,8 @@ async def _do_dl(bot, chat_id: int, uid: int, tr: dict, ctx):
         await _safe_edit(bot, chat_id, status_id,
                          f'❌ <b>Не удалось скачать</b>\n<i>{artist} — {title}</i>',
                          InlineKeyboardMarkup([
-                             [InlineKeyboardButton("Поиск",   callback_data="goto_search", icon_custom_emoji_id=EMO_SEARCH),
-                              InlineKeyboardButton("Главная", callback_data="home",        icon_custom_emoji_id=EMO_HOME)],
+                             [InlineKeyboardButton("🔎 Поиск",   callback_data="goto_search"),
+                              InlineKeyboardButton("🏠 Главная", callback_data="home")],
                          ]))
 
 # ═══════════════════════════════════════════════════
@@ -892,7 +851,6 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         pass
     if uid not in ADMIN_IDS and is_banned(uid):
         return
-    # Чистим предыдущие сообщения бота
     for key in ("mid", "main_mid"):
         await _safe_delete(ctx.bot, update.effective_chat.id, ctx.user_data.get(key))
     await _del_extra(ctx.bot, update.effective_chat.id, ctx)
@@ -930,7 +888,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not search_mid:
             return
         await _safe_edit(ctx.bot, chat_id, search_mid,
-                         f'<b><tg-emoji emoji-id="{EMO_SEARCH}">🔎</tg-emoji> {text}...</b>')
+                         f'<b>🔎 {text}...</b>')
         items = await asyncio.to_thread(yt_search, text, SEARCH_LIMIT)
         ctx.user_data["res"] = items
         ctx.user_data["spage"] = 0
@@ -943,10 +901,10 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         rev_mid = ctx.user_data.get("rev_mid") or ctx.user_data.get("mid")
         if rev_mid:
             await _safe_edit(ctx.bot, chat_id, rev_mid,
-                             f'<b><tg-emoji emoji-id="{EMO_OK}">✅</tg-emoji> Отзыв #{rev_id} сохранён! {_stars(stars)}</b>\n\n<i>{text}</i>',
+                             f'<b>✅ Отзыв #{rev_id} сохранён! {_stars(stars)}</b>\n\n<i>{text}</i>',
                              InlineKeyboardMarkup([
-                                 [InlineKeyboardButton("Все отзывы", callback_data="reviews", icon_custom_emoji_id=EMO_REVIEW)],
-                                 [InlineKeyboardButton("Главная",     callback_data="home",    icon_custom_emoji_id=EMO_HOME)],
+                                 [InlineKeyboardButton("🙂 Все отзывы", callback_data="reviews")],
+                                 [InlineKeyboardButton("🏠 Главная",    callback_data="home")],
                              ]))
 
     elif state == "broadcast" and uid in ADMIN_IDS:
@@ -957,7 +915,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         bc_mid = ctx.user_data.get("bc_mid") or ctx.user_data.get("mid")
         if bc_mid:
             await _safe_edit(ctx.bot, chat_id, bc_mid,
-                             f'<b><tg-emoji emoji-id="{EMO_SEND}">⬆</tg-emoji> Рассылка: 0/{len(users)}</b>')
+                             f'<b>📢 Рассылка: 0/{len(users)}</b>')
         for i, target_uid in enumerate(users):
             if target_uid in bans:
                 fail += 1
@@ -972,9 +930,9 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(0.05)
         if bc_mid:
             await _safe_edit(ctx.bot, chat_id, bc_mid,
-                             f'<b><tg-emoji emoji-id="{EMO_OK}">✅</tg-emoji> Рассылка завершена\n'
+                             f'<b>✅ Рассылка завершена\n'
                              f'Доставлено: {ok} | Ошибок: {fail}</b>',
-                             InlineKeyboardMarkup([[InlineKeyboardButton("В панель", callback_data="admin", icon_custom_emoji_id=EMO_ADMIN)]]))
+                             InlineKeyboardMarkup([[InlineKeyboardButton("⚙️ В панель", callback_data="admin")]]))
 
 
 async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1043,25 +1001,23 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── Избранное под треком ──
     elif d.startswith("trf_"):
         vid = d[4:]
-        # Ищем трек в памяти, потом в избранном (на случай если ctx сбросился)
         tr = ctx.user_data.get("last_track") or ctx.user_data.get("cur")
         if not tr or tr.get("id") != vid:
             tr = next((t for t in fav_list(uid) if t["id"] == vid), None)
         if not tr:
-            # Минимальный объект — хватит для fav_add/fav_rm
             tr = {"id": vid, "title": "", "artist": ""}
         if fav_ok(uid, vid):
             fav_rm(uid, vid)
             new_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("❤️ В избранное", callback_data=f"trf_{vid}", icon_custom_emoji_id=EMO_HEART),
-                 InlineKeyboardButton("🗑 Удалить",     callback_data="del_track",  icon_custom_emoji_id=EMO_TRASH)],
+                [InlineKeyboardButton("❤️ В избранное", callback_data=f"trf_{vid}"),
+                 InlineKeyboardButton("🗑 Удалить",     callback_data="del_track")],
             ])
             await q.answer("Убрано из избранного", show_alert=False)
         else:
             fav_add(uid, tr)
             new_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("💔 Убрать",  callback_data=f"trf_{vid}", icon_custom_emoji_id=EMO_UNHEART),
-                 InlineKeyboardButton("🗑 Удалить", callback_data="del_track",  icon_custom_emoji_id=EMO_TRASH)],
+                [InlineKeyboardButton("💔 Убрать",  callback_data=f"trf_{vid}"),
+                 InlineKeyboardButton("🗑 Удалить", callback_data="del_track")],
             ])
             await q.answer("Добавлено в избранное ❤️", show_alert=False)
         try:
@@ -1090,12 +1046,11 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── Волна ──
     elif d == "wave":
         await _del_extra(bot, chat_id, ctx)
-        await _safe_edit(bot, chat_id, msg_id,
-                         f'<b><tg-emoji emoji-id="{EMO_WAVE}">🌊</tg-emoji> Подбираю треки...</b>')
+        await _safe_edit(bot, chat_id, msg_id, '<b>🌊 Подбираю треки...</b>')
         w = await asyncio.to_thread(yt_wave, uid)
         if not w:
             await _safe_edit(bot, chat_id, msg_id, "<b>Не удалось подобрать треки</b>",
-                             InlineKeyboardMarkup([[InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]]))
+                             InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главная", callback_data="home")]]))
             return
         ctx.user_data["wave"] = w
         ctx.user_data["wi"]   = 0
@@ -1113,8 +1068,8 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await _show_wave(bot, chat_id, msg_id, w[i], uid, ctx)
         else:
             await _safe_edit(bot, chat_id, msg_id,
-                             f'<b><tg-emoji emoji-id="{EMO_WAVE}">🌊</tg-emoji> Треки закончились</b>',
-                             InlineKeyboardMarkup([[InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]]))
+                             '<b>🌊 Треки закончились</b>',
+                             InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главная", callback_data="home")]]))
 
     elif d == "wp":
         w = ctx.user_data.get("wave", [])
@@ -1145,8 +1100,7 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await _del_extra(bot, chat_id, ctx)
         cached, cached_at = _chart_cache
         if not (cached and (time.time() - cached_at) < CHART_CACHE_TTL):
-            await _safe_edit(bot, chat_id, msg_id,
-                             f'<b><tg-emoji emoji-id="{EMO_CHART}">📊</tg-emoji> Загружаю хиты...</b>')
+            await _safe_edit(bot, chat_id, msg_id, '<b>📊 Загружаю хиты...</b>')
         ctx.user_data["cpage"] = 0
         await _show_charts(bot, chat_id, msg_id, ctx, 0)
 
@@ -1192,7 +1146,7 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["state"]   = "rev_stars"
         ctx.user_data["rev_mid"] = msg_id
         await _safe_edit(bot, chat_id, msg_id,
-                         f'<b><tg-emoji emoji-id="{EMO_REVIEW}">🙂</tg-emoji> Оцени бота от 1 до 5:</b>',
+                         '<b>🙂 Оцени бота от 1 до 5:</b>',
                          _stars_kb())
 
     elif d.startswith("rev_s_"):
@@ -1201,8 +1155,8 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["state"]     = "rev_text"
         ctx.user_data["rev_mid"]   = msg_id
         await _safe_edit(bot, chat_id, msg_id,
-                         f'<b><tg-emoji emoji-id="{EMO_REVIEW}">🙂</tg-emoji> Оценка: {stars}/5\n\nНапиши свой отзыв:</b>',
-                         InlineKeyboardMarkup([[InlineKeyboardButton("Главная", callback_data="home", icon_custom_emoji_id=EMO_HOME)]]))
+                         f'<b>🙂 Оценка: {stars}/5\n\nНапиши свой отзыв:</b>',
+                         InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главная", callback_data="home")]]))
 
     # ── Админ ──
     elif d == "admin":
@@ -1253,9 +1207,9 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["state"] = "broadcast"
         bc_msg = await bot.send_message(
             chat_id,
-            f'<b><tg-emoji emoji-id="{EMO_SEND}">⬆</tg-emoji> Отправь сообщение для рассылки (HTML поддерживается):</b>',
+            '<b>📢 Отправь сообщение для рассылки (HTML поддерживается):</b>',
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отмена", callback_data="admin", icon_custom_emoji_id=EMO_HOME)]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Отмена", callback_data="admin")]])
         )
         ctx.user_data["bc_mid"] = bc_msg.message_id
         _track_msg(ctx, bc_msg.message_id)
@@ -1295,17 +1249,14 @@ async def on_cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ═══════════════════════════════════════════════════
 
 async def _chart_auto_update():
-    """Фоновая задача: обновляет кэш хитов каждые 30 минут."""
-    # Первый запуск — сразу
     log.info("charts: прогреваю кэш при старте...")
     await asyncio.to_thread(yt_charts)
     log.info("charts: кэш готов ✅")
-    # Бесконечный цикл обновления
     while True:
         await asyncio.sleep(CHART_CACHE_TTL)
         log.info("charts: плановое обновление кэша...")
         global _chart_cache
-        _chart_cache = ([], 0.0)  # сбрасываем кэш чтобы yt_charts загрузил свежие
+        _chart_cache = ([], 0.0)
         await asyncio.to_thread(yt_charts)
         log.info("charts: кэш обновлён ✅")
 
