@@ -28,7 +28,7 @@ import yt_dlp
 #  НАСТРОЙКИ
 # ═══════════════════════════════════════════════════
 
-BOT_TOKEN       = "8746018197:AAGBrL62143LPDOZkhrWVRJIE5w46rFV0Y8"
+BOT_TOKEN       = "8437274077:AAEFrOv48UW8KGQBl51jqfM5ts-17Vn_Xks"
 ADMIN_IDS       = [8535260202]
 CHANNEL_ID      = "-1003852929433"
 CHANNEL_LINK    = "https://t.me/FV_bots"
