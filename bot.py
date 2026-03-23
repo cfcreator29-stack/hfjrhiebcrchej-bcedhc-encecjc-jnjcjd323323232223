@@ -2,6 +2,16 @@
 🎶 Music — Telegram Music Bot
 """
 
+import telegram
+from telegram import InlineKeyboardButton as _OrigBtn
+
+_PTB_SUPPORTS_EMOJI = tuple(int(x) for x in telegram.__version__.split(".")[:2]) >= (21, 0)
+
+def InlineKeyboardButton(text, **kwargs):
+    if not _PTB_SUPPORTS_EMOJI:
+        kwargs.pop("icon_custom_emoji_id", None)
+    return _OrigBtn(text, **kwargs)
+
 from __future__ import annotations
 
 import json
